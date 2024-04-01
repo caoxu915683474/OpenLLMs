@@ -1,7 +1,7 @@
 import sys
 
 sys.path.append("../")
-from extra.utils import read_yaml
+from extras.utils import read_yaml
 
 
 DATA_INFO = read_yaml("../data/conf/data.yaml")

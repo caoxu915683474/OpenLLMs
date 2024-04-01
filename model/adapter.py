@@ -1,37 +1,37 @@
 import sys
+from dataclasses import dataclass
 import torch
 from transformers.integrations import is_deepspeed_zero3_enabled
 from transformers import PreTrainedModel
 from peft import LoraConfig, LoraModel, PeftModel, TaskType, get_peft_model
 
 sys.path.append("../")
-from extra.logger import get_logger
+from extras.logger import get_logger
 from model.utils import find_all_linear_modules, find_expanded_modules
 
 
 logger = get_logger(__name__)
 
 
+@dataclass
 class LMAdapterWapper:
     """ LMAdapter """
-    def __init__(self, 
-                 adapter_name_or_path: str,
-                 finetuning_type: str,
-                 pure_bf16: bool,
-                 use_llama_pro: bool,
-                 num_layer_trainable: int,
-                 use_dora: bool,
-                 offload_folder: str,
-                 is_trainable: bool) -> None:
-        """ __init__ """
-        self.adapter_name_or_path = adapter_name_or_path
-        self.finetuning_type = finetuning_type
-        self.pure_bf16 = pure_bf16
-        self.use_llama_pro = use_llama_pro
-        self.num_layer_trainable = num_layer_trainable
-        self.use_dora = use_dora
-        self.offload_folder = offload_folder
-        self.is_trainable = is_trainable
+    adapter_path: str
+    finetuning_type: str
+    pure_bf16: bool
+    use_llama_pro: bool
+    num_layer_trainable: int
+    use_dora: bool
+    offload_folder: str
+    create_new_adapter: bool
+    lora_rank: int
+    lora_target: str
+    lora_alpha: int
+    lora_dropout: float
+    use_rslora: bool
+    use_unsloth: bool
+    additional_target: str
+    is_trainable: bool
     
     def no_adapter(self, model: "PreTrainedModel") -> "PreTrainedModel":
         """ no_adapter """
@@ -56,7 +56,7 @@ class LMAdapterWapper:
         if self.use_llama_pro:
             if num_layers % self.num_layer_trainable != 0:
                 raise ValueError("`num_layers` {} should be divisible by `num_layer_trainable` {}.".\
-                                 format(num_layers, finetuning_args.num_layer_trainable))
+                                 format(num_layers, self.num_layer_trainable))
             stride = num_layers // self.num_layer_trainable
             trainable_layer_ids = range(stride - 1, num_layers + stride - 1, stride)
         elif self.num_layer_trainable > 0:
@@ -86,20 +86,21 @@ class LMAdapterWapper:
         """ lora """
         logger.info("Fine-tuning method: {}".format("DoRA" if self.use_dora else "LoRA"))
         adapter_to_resume = None
-        if self.adapter_name_or_path is not None:
+        if self.adapter_path is not None:
             is_mergeable = True
             if getattr(model, "quantization_method", None):  # merge lora in quantized model is unstable.
-                assert len(self.adapter_name_or_path) == 1, "Quantized model only accepts a single adapter."
+                assert len(self.adapter_path) == 1, "Quantized model only accepts a single adapter."
                 is_mergeable = False
             if is_deepspeed_zero3_enabled():
-                assert len(self.adapter_name_or_path) == 1, "Cannot use multiple adapters in DeepSpeed ZeRO-3."
+                assert len(self.adapter_path) == 1, "Cannot use multiple adapters in DeepSpeed ZeRO-3."
+                is_mergeable = False
             if (self.is_trainable and not self.create_new_adapter) or (not is_mergeable):
-                adapter_to_merge = self.adapter_name_or_path[:-1]
-                adapter_to_resume = self.adapter_name_or_path[-1]
+                adapter_to_merge = self.adapter_path[:-1]
+                adapter_to_resume = self.adapter_path[-1]
             else:
-                adapter_to_merge = self.adapter_name_or_path
+                adapter_to_merge = self.adapter_path
             for adapter in adapter_to_merge:
-                model: "LoraModel" = PeftModel.from_pretrained( model, adapter, offload_folder=self.offload_folder)
+                model: "LoraModel" = PeftModel.from_pretrained(model, adapter, offload_folder=self.offload_folder)
                 model = model.merge_and_unload()
             if len(adapter_to_merge) > 0:
                 logger.info("Merged {} adapter(s).".format(len(adapter_to_merge)))
@@ -137,13 +138,13 @@ class LMAdapterWapper:
         if not self.pure_bf16:
             for param in filter(lambda p: p.requires_grad, model.parameters()):
                 param.data = param.data.to(torch.float32)
-        if model_args.adapter_name_or_path is not None:
-            logger.info("Loaded adapter(s): {}".format(",".join(self.adapter_name_or_path)))
+        if self.adapter_path is not None:
+            logger.info("Loaded adapter(s): {}".format(",".join(self.adapter_path)))
         return model
     
     def __call__(self, model: "PreTrainedModel") -> "PreTrainedModel":
         """ __call__ """
-        if (not self.is_trainable) and self.adapter_name_or_path is None:
+        if (not self.is_trainable) and self.adapter_path is None:
             model = self.no_adapter(model)
         elif self.finetuning_type == "full" and self.is_trainable:
             model = self.full_param(model)

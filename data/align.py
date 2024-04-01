@@ -1,13 +1,16 @@
 import sys
-from typing import Union, Dict, List, Any, Optional
+from typing import Union, Dict, List, Any, Literal
+from datasets import Dataset, IterableDataset, Features
 
+sys.path.append("../")
+from data import ROLE
 
 class SFTAlignWrapper:
     """ SFTAlignWrapper """
     def __init__(self, 
                  columns: List[str], 
                  tags: Dict[str, Any], 
-                 formatting: str) -> None:
+                 formatting: Literal["alpaca", "sharegpt"]) -> None:
         """ __init__ """
         self.columns = columns
         self.tags = tags
@@ -15,26 +18,34 @@ class SFTAlignWrapper:
     
     def alpaca(self, examples: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         """ alpaca_align """
-        outputs = {"prompt": [], "response": [], "system": []}
-        for i in range(len(examples[self.colmns["prompt"]])):
+        outputs = {"prompt": [], "response": [], "system": [], "tools": []}
+        for i in range(len(examples[self.columns["prompt"]])):
             prompt = []
-            if self.colmns["history"] and isinstance(examples[self.colmns["history"]][i], list):
-                for old_prompt, old_response in examples[self.colmns["history"]][i]:
+            if self.columns["history"] and self.columns["history"] in examples \
+                and isinstance(examples[self.columns["history"]][i], list):
+                for old_prompt, old_response in examples[self.columns["history"]][i]:
                     prompt.append({"role": ROLE["USER"], "content": old_prompt})
                     prompt.append({"role": ROLE["ASSISTANT"], "content": old_response})
             content = []
-            if self.colmns["prompt"] and examples[self.colmns["prompt"]][i]:
-                content.append(examples[self.colmns["prompt"]][i])
-            if self.colmns["query"] and examples[self.colmns["query"]][i]:
-                content.append(examples[self.colmns["query"]][i])
+            if self.columns["prompt"] and self.columns["prompt"] in examples \
+                and examples[self.columns["prompt"]][i]:
+                content.append(examples[self.columns["prompt"]][i])
+            if self.columns["query"] and self.columns["query"] in examples \
+                and examples[self.columns["query"]][i]:
+                content.append(examples[self.columns["query"]][i])
             prompt.append({"role": ROLE["USER"], "content": "\n".join(content)})
-            if self.colmns["response"] and isinstance(examples[self.colmns["response"]][i], list):
-                response = [{"role": ROLE["ASSISTANT"], "content": content} for content in examples[self.colmns["response"]][i]]
-            elif self.colmns["response"] and isinstance(examples[self.colmns["response"]][i], str):
-                response = [{"role": ROLE["ASSISTANT"], "content": examples[self.colmns["response"]][i]}]
+            if self.columns["response"] and self.columns["response"] in examples \
+                and isinstance(examples[self.columns["response"]][i], list):
+                response = [{"role": ROLE["ASSISTANT"], "content": content} \
+                                for content in examples[self.columns["response"]][i]]
+            elif self.columns["response"] and self.columns["response"] in examples \
+                and isinstance(examples[self.columns["response"]][i], str):
+                response = [{"role": ROLE["ASSISTANT"], "content": examples[self.columns["response"]][i]}]
             else:
                 response = []
-            system = examples[self.colmns["system"]][i] if self.colmns["system"] else ""
+            system = examples[self.columns["system"]][i] if self.columns["system"] \
+                                                            and self.columns["system"] in examples else ""
+            system = ""
             outputs["prompt"].append(prompt)
             outputs["response"].append(response)
             outputs["system"].append(system)
@@ -52,12 +63,12 @@ class SFTAlignWrapper:
         odd_tags = (self.tags["user_tag"], self.tags["observation_tag"])
         even_tags = (self.tags["assistant_tag"], self.tags["function_tag"])
         accept_tags = (odd_tags, even_tags)
-        for i, messages in enumerate(examples[self.colmns["messages"]]):
+        for i, messages in enumerate(examples[self.columns["messages"]]):
             if self.tags["system_tag"] and messages[0][self.tags["role_tag"]] == self.tags["system_tag"]:
                 system = messages[0][self.tags["content_tag"]]
                 messages = messages[1:]
             else:
-                system = examples[self.colmns["system"]][i] if self.colmns["system"] else ""
+                system = examples[self.columns["system"]][i] if self.columns["system"] else ""
             messages = messages[: len(messages) // 2 * 2]  # should be multiples of 2
             if len(messages) == 0:
                 continue
@@ -67,7 +78,7 @@ class SFTAlignWrapper:
                     raise ValueError("Invalid role tag in {}.".format(messages))
                 aligned_messages.append({"role": tag_mapping[message[self.tags["role_tag"]]], 
                                          "content": message[self.tags["content_tag"]]})
-            tools = examples[self.colmns["tools"]][i] if self.colmns["tools"] else ""
+            tools = examples[self.columns["tools"]][i] if self.columns["tools"] else ""
             outputs["prompt"].append(aligned_messages[:-1])
             outputs["response"].append(aligned_messages[-1:])
             outputs["system"].append(system)
@@ -82,6 +93,7 @@ class SFTAlignWrapper:
                                        "content": {"dtype": "string", "_type": "Value"}}],
                          "system": {"dtype": "string", "_type": "Value"},
                          "tools": {"dtype": "string", "_type": "Value"}}
+        features = Features.from_dict(features_dict)
         remove_columns = list(next(iter(dataset)).keys())
         return dataset.map(eval("self.{}".format(self.formatting)), 
                            batched=True, 

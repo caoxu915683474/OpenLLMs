@@ -4,8 +4,8 @@ from typing import Literal, Optional
 
 
 @dataclass
-class FinetuningArguments(FreezeArguments, LoraArguments, RLHFArguments, GaloreArguments):
-    """ FinetuningArguments """
+class FreezeArguments:
+    """ FreezeArguments """
     name_module_trainable: str = field(default="all", 
                                        metadata={"help": """Name of trainable modules for partial-parameter (freeze) fine-tuning. \
                                                             Use commas to separate multiple modules. \
@@ -17,7 +17,7 @@ class FinetuningArguments(FreezeArguments, LoraArguments, RLHFArguments, GaloreA
                                                             Others choices: the same as LLaMA."""})
     num_layer_trainable: int = field(default=2,
                                      metadata={"help": "The number of trainable layers for partial-parameter (freeze) fine-tuning."})
-
+    
 
 @dataclass
 class LoraArguments:
@@ -93,6 +93,15 @@ class FinetuningArguments(FreezeArguments, LoraArguments, RLHFArguments, GaloreA
 
     def __post_init__(self):
         """ __post_init__ """
+        def split_arg(arg):
+            if isinstance(arg, str):
+                return [item.strip() for item in arg.split(",")]
+            else:
+                return arg
+        self.name_module_trainable = split_arg(self.name_module_trainable)
+        self.lora_target = split_arg(self.lora_target)
+        self.additional_target = split_arg(self.additional_target)
+        self.galore_target = split_arg(self.galore_target)
         self.lora_alpha = self.lora_alpha or self.lora_rank * 2
         assert self.finetuning_type in ["lora", "freeze", "full"], "Invalid fine-tuning method."
         assert self.ref_model_quantization_bit in [None, 8, 4], "We only accept 4-bit or 8-bit quantization."

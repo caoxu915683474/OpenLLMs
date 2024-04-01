@@ -1,41 +1,17 @@
 alpaca_data_zh_51k_100p:
     factory: "AlpacaSFTLMDatasetFactory"
-    load_from: "/root/autodl-tmp/OpenLLMS/data/examples/alpaca_data_zh_51k_100p.jsonl.zst"
+    load_from: "/root/autodl-tmp/OpenLLMs/data/examples/alpaca_data_zh_51k_100p.jsonl.zst"
     name: "alpaca_data_zh_51k_100p"
     cutoff_len: 4096
     reserved_label_len: 1
     packed: False
-    template: "qwen_v1"
     train_on_prompt: True
     
 alpaca_data_zh_51k_100p2:
     factory: "AlpacaSFTLMDatasetFactory"
-    load_from: "/root/autodl-tmp/OpenLLMS/data/examples/alpaca_data_zh_51k_100p2.jsonl.zst"
+    load_from: "/root/autodl-tmp/OpenLLMs/data/examples/alpaca_data_zh_51k_100p2.jsonl.zst"
     name: "alpaca_data_zh_51k_100p2"
     cutoff_len: 4096
     reserved_label_len: 1
-    template: "qwen_v1"
     train_on_prompt: False    
-    packed: True
-
-# alpaca_data_zh_51k_100p:
-#   load_from: "/root/autodl-tmp/OpenLLMS/data/examples/alpaca_data_zh_51k_100p.jsonl.zst"
-#   template: "qwen_v1"
-#   stage: "sft"
-#   formatting: "alpaca"
-
-# alpaca_data_zh_51k:
-#   load_from: "/root/autodl-tmp/OpenLLMS/data/examples/alpaca_data_zh_51k.jsonl.zst"
-#   template: "qwen_v1"
-#   stage: "sft"
-#   formatting: "alpaca"
-# alpaca_gpt4_data_zh:
-#   load_from: "/root/autodl-tmp/OpenLLMS/data/examples/alpaca_gpt4_data_zh.jsonl.zst"
-#   template: "qwen_v1"
-#   stage: "sft"
-#   formatting: "alpaca"
-# comparison_gpt4_data_zh:
-#   load_from: "/root/autodl-tmp/OpenLLMS/data/examples/comparison_gpt4_data_zh.jsonl.zst"
-#   template: "qwen_v1"
-#   stage: "sft"
-#   formatting: "alpaca"
+    packed: False

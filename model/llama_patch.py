@@ -1,3 +1,5 @@
+import torch
+from typing import Optional, Tuple
 from transformers.models.llama.modeling_llama import LlamaAttention, LlamaFlashAttention2
 
 

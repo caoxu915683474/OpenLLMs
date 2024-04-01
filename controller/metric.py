@@ -1,5 +1,7 @@
 import sys
+import numpy as np
 from dataclasses import dataclass
+from typing import Dict, Union, Sequence, Tuple
 
 import jieba
 from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu

@@ -1,21 +1,28 @@
 import sys
+from dataclasses import dataclass
 from typing import Dict, Any
-from transformers import PretrainedConfig
+from transformers import AutoConfig
 
 sys.path.append("../")
-from extra.logger import get_logger
+from extras.logger import get_logger
 
 logger = get_logger(__name__)
 
 
+@dataclass
 class LMConfig:
     """ LMConfig """
-    def __init__(self, path: str, init_kwargs: Dict[str, Any]) -> None:
-        """ __init__ """
-        self.path = path
-        self.init_kwargs = init_kwargs
+    path: str
+    init_kwargs: Dict[str, Any]
     
-    def load(self) -> "PretrainedConfig":
-        """ load """
-        config = AutoAutoConfigTokenizer.from_pretrained(self.path, **self.init_kwargs)
-        return config
+    def __post_init__(self) -> None:
+        """ __post_init__ """
+        self.set_config()
+    
+    def set_config(self) -> None:
+        """ set_config """
+        self.config = AutoConfig.from_pretrained(self.path, **self.init_kwargs)
+    
+    def get_config(self) -> "PretrainedConfig":
+        """ get_config """
+        return self.config

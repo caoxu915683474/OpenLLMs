@@ -1,4 +1,6 @@
 import sys
+from dataclasses import dataclass
+from typing import Union
 from torch import nn
 from datasets import Dataset, IterableDataset
 from transformers import (Trainer, 
@@ -15,22 +17,15 @@ from controller.metric import LMMetrics
 from controller.callback import LogCallback
 
 
+@dataclass
 class TrainerHelper:
     """ TrainerHelper """
-    def __init__(self,
-                 model:  Union["PreTrainedModel", "Module"],
-                 tokenizer: "PreTrainedTokenizer",
-                 train_dataset: Union["Dataset", "IterableDataset"],
-                 eval_dataset: Union["Dataset", "IterableDataset"],
-                 trainning_args: "TrainingArguments"
-                 finetuning_args: "FinetuningArguments") -> None:
-        """ __init__ """
-        self.model = model
-        self.tokenizer = tokenizer
-        self.train_dataset = train_dataset
-        self.eval_dataset = eval_dataset
-        self.trainning_args = trainning_args
-        self.finetuning_args = finetuning_args
+    model:  Union["PreTrainedModel", "nn.Module"]
+    tokenizer: "PreTrainedTokenizer"
+    train_dataset: Union["Dataset", "IterableDataset"]
+    eval_dataset: Union["Dataset", "IterableDataset"]
+    training_args: "TrainingArguments"
+    finetuning_args: "FinetuningArguments"
     
     def __post_init__(self) -> None:
         """ __post_init__ """
@@ -39,7 +34,7 @@ class TrainerHelper:
     def set_data_collator(self) -> None:
         """ set_collator """
         self.data_collator = DataCollatorForSeq2Seq(tokenizer=self.tokenizer,
-                                                    pad_to_multiple_of=8 \ # for shift short attention
+                                                    pad_to_multiple_of=8 \
                                                         if self.tokenizer.padding_side == "right" else None,
                                                     label_pad_token_id=IGNORE_INDEX)
     
@@ -58,7 +53,7 @@ class TrainerHelper:
         self.set_callbacks()
         self.trainer = LMTrainer(model=self.model, 
                                  tokenizer=self.tokenizer,
-                                 trainning_args=self.trainning_args, 
+                                 training_args=self.training_args, 
                                  finetuning_args=self.finetuning_args, 
                                  data_collator=self.data_collator, 
                                  train_dataset=self.train_dataset, 

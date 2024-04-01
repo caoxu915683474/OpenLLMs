@@ -2,8 +2,9 @@ import sys
 import math
 import random
 from types import MethodType
+from dataclasses import dataclass
 from contextlib import nullcontext
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Literal
 import torch
 from datasets import concatenate_datasets, interleave_datasets
 from transformers.utils.versions import require_version
@@ -17,10 +18,9 @@ from transformers import (PreTrainedModel,
 
 sys.path.append("../")
 from data.dataset import LMDataset
-from data.info import DatasetAttr, get_dataset_list
-from extra.logger import get_logger
-from extra.misc import get_current_device
-from extra.packages import is_flash_attn2_available
+from extras.logger import get_logger
+from extras.misc import get_current_device, infer_optim_dtype
+from extras.packages import is_flash_attn2_available
 from model.llama_patch import apply_llama_patch
 from model.mixtral_patch import patch_mixtral_replace_moe_impl
 
@@ -30,60 +30,47 @@ SUPPORTED_CLASS_FOR_S2ATTN = ["llama"]
 
 class TokenizerPatcher:
     """ TokenizerPatcher """
-    def __init__(self) -> None:
-        """ __init__ """
-        ...
-    
     def __call__(self, tokenizer: "PreTrainedTokenizer") -> "PreTrainedTokenizer":
         """ __call__ """
         if "PreTrainedTokenizerBase" not in str(tokenizer._pad.__func__):
             tokenizer._pad = MethodType(PreTrainedTokenizerBase._pad, tokenizer)
+        return tokenizer
 
 
+@dataclass
 class ConfigPatcher:
     """ ConfigPatcher """
-    def __init__(self, 
-                 tokenizer: "PreTrainedTokenizer",
-                 compute_dtype: Optional[torch.float16, torch.bfloat16, torch.float32],
-                 rope_scaling: bool,
-                 model_max_length: int,
-                 shift_attn: bool,
-                 flash_attn: bool,
-                 low_cpu_mem_usage bool, 
-                 device_map: Dict[str, Any],
-                 is_trainable: bool,
-                 quantization_dataset: str,
-                 export_quantization_maxlen: int,
-                 export_quantization_nsamples: int,
-                 export_quantization_bit: int,
-                 offload_folder: str,
-                 init_kwargs: Dict[str, Any]) -> None:
-        """ __init__ """
-        self.tokenizer = tokenizer
-        self.compute_dtype = compute_dtype
-        self.rope_scaling = rope_scaling
-        self.model_max_length = model_max_length
-        self.shift_attn = shift_attn
-        self.flash_attn = flash_attn
-        self.low_cpu_mem_usage = low_cpu_mem_usage
-        self.device_map = device_map
-        self.is_trainable = is_trainable
-        self.quantization_dataset = quantization_dataset
-        self.export_quantization_maxlen = export_quantization_maxlen
-        self.export_quantization_nsamples = export_quantization_nsamples
-        self.export_quantization_bit = export_quantization_bit
-        self.offload_folder = offload_folder
-        self.init_kwargs = init_kwargs
+    tokenizer: "PreTrainedTokenizer"
+    compute_dtype: Literal[torch.float16, torch.bfloat16, torch.float32]
+    rope_scaling: bool
+    model_max_length: int
+    shift_attn: bool
+    flash_attn: bool
+    low_cpu_mem_usage: bool
+    device_map: Dict[str, Any]
+    use_cache: bool
+    is_trainable: bool
+    quantization_bit: int
+    double_quantization: bool
+    quantization_type: str
+    export_quantization_dataset: str
+    export_quantization_maxlen: int
+    export_quantization_nsamples: int
+    export_quantization_bit: int
+    offload_folder: str
+    init_kwargs: Dict[str, Any]
     
     def configure_attn_implementation(self) -> None:
         """ configure_attn_implementation """
         if self.flash_attn:
             if is_flash_attn2_available():
                 logger.info("Using FlashAttention-2 for faster training and inference.")
-                self.init_kwargs["attn_implementation"] = "flash_attention_2"
+                if getattr(config, "model_type", None) == "internlm2": 
+                    setattr(config, "attn_implementation", "flash_attention_2")
+                else:
+                    self.init_kwargs["attn_implementation"] = "flash_attention_2"
             else:
                 logger.warning("FlashAttention2 is not installed.")
-                self.init_kwargs["attn_implementation"] = None
         else:
             self.init_kwargs["attn_implementation"] = "eager"
     
@@ -126,7 +113,7 @@ class ConfigPatcher:
         Inspired by: https://github.com/huggingface/optimum/blob/v1.16.0/optimum/gptq/data.py#L133
         TODO: remove tokenizer.decode() https://github.com/huggingface/optimum/pull/1600 
         """
-        dataset_attrs = get_dataset_list(self.quantization_dataset)
+        dataset_attrs = get_dataset_list(self.export_quantization_dataset)
         all_datasets = []
         for dataset_attr in dataset_attrs: 
             conf = dataset_attr.get_confs()
@@ -179,11 +166,32 @@ class ConfigPatcher:
             init_kwargs["device_map"] = "auto"
             init_kwargs["max_memory"] = get_max_memory()
             logger.info("Quantizing model to {} bit.".format(self.export_quantization_bit))
+        elif self.quantization_bit is not None:  # bnb
+            if is_deepspeed_zero3_enabled():
+                require_version("transformers>=4.39.0", "To fix: pip install transformers>=4.39.0")
+                require_version("accelerate>=0.28.0", "To fix: pip install accelerate>=0.28.0")
+                require_version("bitsandbytes>=0.43.0", "To fix: pip install bitsandbytes>=0.43.0")
+            if self.quantization_bit == 8:
+                require_version("bitsandbytes>=0.37.0", "To fix: pip install bitsandbytes>=0.37.0")
+                init_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
+            elif self.quantization_bit == 4:
+                require_version("bitsandbytes>=0.39.0", "To fix: pip install bitsandbytes>=0.39.0")
+                init_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True,
+                                                                        bnb_4bit_compute_dtype=self.compute_dtype,
+                                                                        bnb_4bit_use_double_quant=self.double_quantization,
+                                                                        bnb_4bit_quant_type=self.quantization_type,
+                                                                        bnb_4bit_quant_storage=self.compute_dtype)
+
+            init_kwargs["device_map"] = {"": get_current_device()}
+            logger.info("Quantizing model to {} bit.".format(self.quantization_bit))
     
 
     def __call__(self, config: "PretrainedConfig") -> "PretrainedConfig":
         """ __call__ """
+        if self.compute_dtype is None:
+            self.compute_dtype = infer_optim_dtype(model_dtype=getattr(config, "torch_dtype", None))
         if getattr(config, "model_type", None) == "qwen":
+            setattr(config, "use_flash_attn", self.flash_attn)
             for dtype_name, dtype in [("fp16", torch.float16), 
                                       ("bf16", torch.bfloat16), 
                                       ("fp32", torch.float32)]:
@@ -195,29 +203,23 @@ class ConfigPatcher:
         if self.use_cache and not self.is_trainable:
             setattr(config, "use_cache", True)
             logger.info("Using KV cache for faster generation.")
-        init_kwargs["torch_dtype"] = self.compute_dtype
+        self.init_kwargs["torch_dtype"] = self.compute_dtype
         if not is_deepspeed_zero3_enabled():
-            init_kwargs["low_cpu_mem_usage"] = self.low_cpu_mem_usage
-            if "device_map" not in init_kwargs:  # quant models cannot use auto device map
-                init_kwargs["device_map"] = self.device_map or {"": get_current_device()}
-            if init_kwargs["device_map"] == "auto":
-                init_kwargs["offload_folder"] = self.offload_folder
+            self.init_kwargs["low_cpu_mem_usage"] = self.low_cpu_mem_usage
+            if "device_map" not in self.init_kwargs:  # quant models cannot use auto device map
+                self.init_kwargs["device_map"] = self.device_map or {"": get_current_device()}
+            if self.init_kwargs["device_map"] == "auto":
+                self.init_kwargs["offload_folder"] = self.offload_folder
 
-
+@dataclass
 class ModelPatcher:
     """ ModelPatcher """
-    def __init__(self, 
-                 tokenizer: "PreTrainedTokenizer", 
-                 is_trainabl: bool,
-                 resize_vocab: bool, 
-                 upcast_layernorm: bool, 
-                 disable_gradient_checkpointing: bool) -> None:
-        """ __init__ """
-        self.tokenizer = tokenizer
-        self.is_trainable = is_trainable
-        self.resize_vocab = resize_vocab
-        self.upcast_layernorm = upcast_layernorm
-        self.disable_gradient_checkpointing = disable_gradient_checkpointing
+    tokenizer: "PreTrainedTokenizer"
+    is_trainable: bool
+    resize_vocab: bool
+    upcast_layernorm: bool
+    disable_gradient_checkpointing: bool
+    upcast_lmhead_output: bool
     
     def noisy_mean_initialization(self, embed_weight: torch.Tensor, num_new_tokens: int):
         """ noisy_mean_initialization """
@@ -275,13 +277,13 @@ class ModelPatcher:
                 model.enable_input_require_grads()
                 setattr(model.config, "use_cache", False)  # turn off when gradient checkpointing is enabled
                 logger.info("Gradient checkpointing enabled.")
-        if hasattr(model, output_layer_name) and model_args.upcast_lmhead_output:
+        if hasattr(model, "lm_head") and self.upcast_lmhead_output:
             def fp32_forward_post_hook(module: torch.nn.Module, 
                                        args: Tuple[torch.Tensor], 
                                        output: torch.Tensor):
                 return output.to(torch.float32)
             logger.info("Upcasting lm_head outputs in float32.")
-            output_layer = getattr(model, output_layer_name)
+            output_layer = getattr(model, "lm_head")
             if isinstance(output_layer, torch.nn.Linear) and output_layer.weight.dtype != torch.float32:
                 output_layer.register_forward_hook(fp32_forward_post_hook)
     
@@ -292,6 +294,12 @@ class ModelPatcher:
         if getattr(model.config, "model_type", None) == "chatglm":
             setattr(model, "lm_head", model.transformer.output_layer)
             setattr(model, "_keys_to_ignore_on_save", ["lm_head.weight"])
+        gen_config = model.generation_config  # check and fix generation config
+        if not gen_config.do_sample and (
+            (gen_config.temperature is not None and gen_config.temperature != 1.0)
+            or (gen_config.top_p is not None and gen_config.top_p != 1.0)
+            or (gen_config.typical_p is not None and gen_config.typical_p != 1.0)):
+            gen_config.do_sample = True
         if self.resize_vocab:
             self.resize_embedding_layer(model)
         if self.is_trainable:
@@ -304,9 +312,10 @@ class ModelPatcher:
             if self.is_trainable:
                 patch_mixtral_replace_moe_impl()
         try:
-            model.add_model_tags(["Model-Cooker_Xu"])
+            model.add_model_tags(["By_Xu"])
         except Exception:
             logger.warning("Cannot properly tag the model.")
+        return model
             
         
         

@@ -2,10 +2,11 @@ import sys
 from transformers import Seq2SeqTrainingArguments, TrainerCallback
 
 sys.path.append("../")
-from train.sft.tokenizer import TokenizerHelper
-from train.sft.data import DatasetHelper
-from train.sft.model import ModelHelper
-from train.sft.trainer import TrainerHelper
+from workflows.sft.tokenizer import TokenizerHelper
+from workflows.sft.data import DatasetHelper
+from workflows.sft.model import ModelHelper
+from workflows.sft.trainer import TrainerHelper
+from workflows.sft.params import ParamHelper
 
 
 class WorkFlow:
@@ -33,20 +34,25 @@ class WorkFlow:
         
     def set_tokenizer(self) -> None:
         """ set_tokenizer """
-        tokenizer_helper = TokenizerHelper(args=self.model_args)
+        tokenizer_helper = TokenizerHelper(args=self.model_args, template=self.data_args.template)
         self.tokenizer = tokenizer_helper.get_tokenizer()
     
     def set_datasets(self) -> None:
         """ set_datasets """
-        dataset_helper = DatasetHelper(args=self.data_args, tokenizer=self.tokenizer)
+        dataset_helper = DatasetHelper(args=self.data_args, 
+                                       tokenizer=self.tokenizer, 
+                                       seed=self.training_args.data_seed, 
+                                       do_train=self.training_args.do_train)
         self.dataset = dataset_helper.get_dataset()
         self.train_dataset = self.dataset.get("train_dataset", None)
         self.eval_dataset = self.dataset.get("eval_dataset", None)
     
     def set_model(self) -> None:
         """ set_model """
-        model_helper = ModelHelper(args=self.model_args, tokenizer=self.tokenizer)
-        self.model = model_helper.get_model()
+        self.model = ModelHelper(args=self.model_args,
+                                 finetuning_args=self.finetuning_args,
+                                 tokenizer=self.tokenizer, 
+                                 is_trainable=self.training_args.do_train).get_model()
     
     def set_trainer(self) -> None:
         """ set_trainer """
@@ -54,7 +60,7 @@ class WorkFlow:
                                        tokenizer=self.tokenizer,
                                        train_dataset=self.train_dataset, 
                                        eval_dataset=self.eval_dataset,
-                                       trainning_args=self.trainning_args, 
+                                       training_args=self.training_args, 
                                        finetuning_args=self.finetuning_args)
         self.trainer = trainer_helper.get_trainer()    
     

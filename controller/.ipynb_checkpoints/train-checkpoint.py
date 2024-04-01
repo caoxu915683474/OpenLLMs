@@ -1,5 +1,6 @@
 import sys
-from typing import Dict, Union, Optional, Tuple, Any, List
+from typing import Dict, Union, Optional, Tuple, Any, List, Callable
+import torch
 from torch import nn
 from datasets import Dataset, IterableDataset
 from transformers import (PreTrainedModel,
@@ -11,7 +12,7 @@ from transformers import (PreTrainedModel,
 
 sys.path.append("../")
 from params.finetuning_args import FinetuningArguments
-from conroller.utils import create_custom_optimizer
+from controller.utils import create_custom_optimizer
 
 
 class LMTrainer(Seq2SeqTrainer):
@@ -19,7 +20,7 @@ class LMTrainer(Seq2SeqTrainer):
     def __init__(self, 
                  model: Union["PreTrainedModel", "nn.Module"], 
                  tokenizer: "PreTrainedTokenizer",
-                 trainning_args: "TrainingArguments",
+                 training_args: "TrainingArguments",
                  finetuning_args: "FinetuningArguments", 
                  data_collator: "DataCollator",
                  train_dataset: Union["Dataset", "IterableDataset"],
@@ -28,7 +29,7 @@ class LMTrainer(Seq2SeqTrainer):
                  compute_metrics: Optional[Callable[["EvalPrediction"], Dict]] = None,
                  **kwargs) -> None:
         super().__init__(model=model, 
-                         args=trainning_args,
+                         args=training_args,
                          data_collator=data_collator,
                          train_dataset=train_dataset,
                          eval_dataset=eval_dataset,
@@ -40,10 +41,10 @@ class LMTrainer(Seq2SeqTrainer):
     
     def create_optimizer_and_scheduler(self, num_training_steps: int) -> None:
         """ create_optimizer_and_scheduler """
-        self.optimizer = create_custom_optimzer(self.model, 
-                                                self.args, 
-                                                self.finetuning_args, 
-                                                num_training_steps)
+        self.optimizer = create_custom_optimizer(self.model, 
+                                                 self.args, 
+                                                 self.finetuning_args, 
+                                                 num_training_steps)
         if self.optimizer is None:
             self.create_optimizer()
         self.create_scheduler(num_training_steps=num_training_steps, optimizer=self.optimizer)

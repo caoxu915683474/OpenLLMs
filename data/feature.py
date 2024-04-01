@@ -5,7 +5,7 @@ from typing import Union, List, Sequence, Tuple, Dict, Any
 from transformers import PreTrainedTokenizer
 
 sys.path.append("../")
-from extra.constant import IGNORE_INDEX
+from extras.constant import IGNORE_INDEX
 
 
 class PTFeatureWrapper:
@@ -78,9 +78,7 @@ class SFTFeatureWrapper:
                 for element in elements:
                     token_ids += self.tokenizer.encode(element, add_special_tokens=False)
                 encoded_messages.append(token_ids)
-            encoded_pairs = make_pairs(encoded_messages, 
-                                       self.cutoff_len, 
-                                       self.reserved_label_len)
+            encoded_pairs = self.make_pairs(encoded_messages)
             for turn_idx, (source_ids, target_ids) in enumerate(encoded_pairs):
                 if self.train_on_prompt:
                     source_mask = source_ids
@@ -117,9 +115,7 @@ class SFTFeatureWrapper:
                     token_ids += self.tokenizer.encode(element, add_special_tokens=False)
                 encoded_messages.append(token_ids)
             input_ids, labels = [], []
-            encoded_pairs = make_pairs(encoded_messages, 
-                                       self.cutoff_len, 
-                                       self.reserved_label_len)
+            encoded_pairs = self.make_pairs(encoded_messages)
             for turn_idx, (source_ids, target_ids) in enumerate(encoded_pairs):
                 if self.train_on_prompt:
                     source_mask = source_ids
@@ -142,7 +138,7 @@ class SFTFeatureWrapper:
         encoded_pairs = []
         total_length = 0
         for i in range(0, len(encoded_messages), 2):
-            if total_length >= cutoff_len: break
+            if total_length >= self.cutoff_len: break
             max_source_len, max_target_len = self.infer_max_len(source_len=len(encoded_messages[i]),
                                                                 target_len=len(encoded_messages[i + 1]),
                                                                 total_length=total_length)
@@ -152,20 +148,24 @@ class SFTFeatureWrapper:
             encoded_pairs.append((source_ids, target_ids))
         return encoded_pairs
     
-    def infer_max_len(self, source_len: int, target_len: int, total_length: int) -> Tuple[int, int]:
+    def infer_max_len(self, 
+                      source_len: int, 
+                      target_len: int, 
+                      total_length: int) -> Tuple[int, int]:
         """ infer_max_len """
         max_len = self.cutoff_len - total_length
         max_target_len = int(max_len * (target_len / (source_len + target_len)))
-        max_target_len = max(max_target_len, reserved_label_len)
+        max_target_len = max(max_target_len, self.reserved_label_len)
         max_source_len = max_len - max_target_len
         return max_source_len, max_target_len
 
-    def __call__(self, dataset: Union["Dataset", "IterableDataset"], 
-                 template_conf: Dict[str, Any]) -> Union["Dataset", "IterableDataset"]:
+    def __call__(self,
+                 dataset: Union["Dataset", "IterableDataset"], 
+                 efficient_eos: bool) -> Union["Dataset", "IterableDataset"]:
         """ __call__ """
         column_names = list(next(iter(dataset)).keys())
         map_func = self.packed_func if self.packed else self.unpacked_func
-        map_func = partial(map_func, efficient_eos=template_conf["efficient_eos"])
+        map_func = partial(map_func, efficient_eos=efficient_eos)
         dataset = dataset.map(map_func, 
                               batched=True, 
                               remove_columns=column_names)

@@ -1,30 +1,40 @@
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, Literal
+from dataclasses import dataclass
+import torch
 from unsloth import FastLanguageModel
-from transformers import PreTrainedModel, PretrainedConfig
+from transformers import PreTrainedModel, PretrainedConfig, AutoModelForCausalLM
 
 sys.path.append("../")
-from extra.logger import get_logger
+from extras.logger import get_logger
+from extras.misc import get_current_device
 
 logger = get_logger(__name__)
 
 
+@dataclass
 class LModel:
     """ LModel """
-    def __init__(self, 
-                 path: str, 
-                 config: "PretrainedConfig",
-                 is_trainable: bool,
-                 init_kwargs: Dict[str, Any]) -> None:
-        """ __init__ """
-        self.path = path
-        self.config = config
-        self.is_trainable = is_trainable
-        self.init_kwargs = init_kwargs
+    path: str
+    config: "PretrainedConfig"
+    is_trainable: bool
+    use_unsloth: bool
+    model_max_length: int
+    compute_dtype: Literal[torch.float16, torch.bfloat16, torch.float32]
+    quantization_bit: int
+    use_adapter: bool
+    init_kwargs: Dict[str, Any]
     
-    def load(self) -> "PreTrainedModel":
-        """ load """
-        model = None
+    def __post_init__(self) -> None:
+        """ __post_init__ """
+        self.setup()
+    
+    def setup(self) -> None:
+        """ setup """
+        self.set_model()
+    
+    def set_model(self) -> None:
+        """ set_model """
         if self.is_trainable and self.use_unsloth:
             from unsloth import FastLanguageModel  # type: ignore
             unsloth_kwargs = {"model_name": self.path,
@@ -32,18 +42,21 @@ class LModel:
                               "dtype": self.compute_dtype,
                               "load_in_4bit": self.quantization_bit == 4,
                               "device_map": {"": get_current_device()},
-                              "rope_scaling": getattr(config, "rope_scaling", None)}
+                              "rope_scaling": getattr(self.config, "rope_scaling", None)}
             try:
-                model, _ = FastLanguageModel.from_pretrained(**unsloth_kwargs)
+                self.model, _ = FastLanguageModel.from_pretrained(**unsloth_kwargs)
             except NotImplementedError:
                 logger.warning("Unsloth does not support model type {}.".\
                                format(getattr(config, "model_type", None)))
-                model_args.use_unsloth = False
-            if model_args.adapter_name_or_path:
-                model_args.adapter_name_or_path = None
+                self.use_unsloth = False
+            if self.use_adapter:
+                self.use_adapter = False
                 logger.warning("Unsloth does not support loading adapters.")
-        if model is None:    
-            model = AutoModelForCausalLM.from_pretrained(self.path, 
-                                                         config=config, 
-                                                         **self.init_kwargs)
-        return tokenizer
+        else:   
+            self.model = AutoModelForCausalLM.from_pretrained(self.path, 
+                                                              config=self.config, 
+                                                              **self.init_kwargs)
+        
+    def get_model(self) -> "PreTrainedModel":
+        """ get_model """
+        return self.model
