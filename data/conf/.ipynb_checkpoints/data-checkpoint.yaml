@@ -13,5 +13,19 @@ alpaca_data_zh_51k_100p2:
     name: "alpaca_data_zh_51k_100p2"
     cutoff_len: 4096
     reserved_label_len: 1
-    train_on_prompt: False    
+    train_on_prompt: False
     packed: False
+    
+yidian1:
+    factory: "PTLMDatasetFactory"
+    load_from: "/root/autodl-tmp/tmp/yidian/"
+    name: "yidian1"
+    cutoff_len: 4096
+    packed: True
+    
+# yidian2:
+#     factory: "PTLMDatasetFactory"
+#     load_from: "/root/autodl-tmp/tmp/yidian/"
+#     name: "yidian2"
+#     cutoff_len: 4096
+#     packed: False

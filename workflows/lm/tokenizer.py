@@ -7,6 +7,7 @@ from model.patch import TokenizerPatcher
 from model.tokenizer import LMTokenizer
 from params.model_args import ModelArguments
 
+
 @dataclass
 class TokenizerHelper:
     """ TokenizerHelper """

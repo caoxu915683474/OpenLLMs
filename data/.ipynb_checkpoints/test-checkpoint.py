@@ -1,6 +1,9 @@
 import sys
 from torch.utils.data import DataLoader
-from transformers import DataCollatorForSeq2Seq, HfArgumentParser, Seq2SeqTrainingArguments
+from transformers import (DataCollatorForSeq2Seq, 
+                          HfArgumentParser, 
+                          Seq2SeqTrainingArguments, 
+                          DataCollatorForLanguageModeling)
 
 sys.path.append("../")
 from extras.constant import IGNORE_INDEX
@@ -33,6 +36,7 @@ if __name__ == '__main__':
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer,
                                            pad_to_multiple_of=8,
                                            label_pad_token_id=IGNORE_INDEX)
+    # data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     dataloader = DataLoader(dataset, 
                             batch_size=2,
                             num_workers=1,
@@ -44,5 +48,5 @@ if __name__ == '__main__':
         print(tokenizer.decode(batch["input_ids"][0], skip_special_tokens=False))
         print("-" * 100)
         print(tokenizer.decode([id_ for id_ in batch["labels"][0] if id_ != -100], skip_special_tokens=False))
-        print(tokenizer.decode([id_  if id_ != -100 else tokenizer.eos_token_id for id_ in batch["labels"][0]], skip_special_tokens=False))
+        # print(tokenizer.decode([id_  if id_ != -100 else tokenizer.eos_token_id for id_ in batch["labels"][0]], skip_special_tokens=False))
         input()

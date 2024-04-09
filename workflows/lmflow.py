@@ -2,15 +2,15 @@ import sys
 from transformers import Seq2SeqTrainingArguments, TrainerCallback
 
 sys.path.append("../")
-from workflows.sft.tokenizer import TokenizerHelper
-from workflows.sft.data import DatasetHelper
-from workflows.sft.model import ModelHelper
-from workflows.sft.trainer import TrainerHelper
-from workflows.sft.params import ParamHelper
+from workflows.lm.tokenizer import TokenizerHelper
+from workflows.lm.data import DatasetHelper
+from workflows.lm.model import ModelHelper
+from workflows.lm.trainer import TrainerHelper
+from workflows.lm.params import ParamHelper
 
 
-class WorkFlow:
-    """ WorkFlow """
+class LMFlow:
+    """ LMFlow: The workflow for Pretrain and Supervised Fine-Tun-ing """
     def __init__(self) -> None:
         """ __init__ """
         self.setup()
@@ -56,18 +56,18 @@ class WorkFlow:
     
     def set_trainer(self) -> None:
         """ set_trainer """
-        trainer_helper = TrainerHelper(model=self.model, 
-                                       tokenizer=self.tokenizer,
-                                       train_dataset=self.train_dataset, 
-                                       eval_dataset=self.eval_dataset,
-                                       training_args=self.training_args, 
-                                       finetuning_args=self.finetuning_args)
-        self.trainer = trainer_helper.get_trainer()    
+        self.trainer = TrainerHelper(model=self.model, 
+                                     tokenizer=self.tokenizer,
+                                     train_dataset=self.train_dataset, 
+                                     eval_dataset=self.eval_dataset,
+                                     training_args=self.training_args, 
+                                     finetuning_args=self.finetuning_args).get_trainer()
     
     def start(self) -> None:
         """ start """
         self.trainer.train()
     
+    
 if __name__ == '__main__':
-    workflow = WorkFlow()
+    workflow = LMFlow()
     workflow.start()

@@ -8,7 +8,10 @@ from transformers import (PreTrainedModel,
                           TrainingArguments, 
                           TrainerCallback, 
                           PreTrainedTokenizer, 
-                          EvalPrediction)
+                          EvalPrediction, 
+                          Trainer)
+from trl import PPOConfig, PPOTrainer
+from trl.core import PPODecorators, logprobs_from_logits
 
 sys.path.append("../")
 from params.finetuning_args import FinetuningArguments
@@ -85,4 +88,22 @@ class LMTrainer(Seq2SeqTrainer):
         padded_tensor[:, -src_tensor.shape[-1] :] = src_tensor  # adopt left-padding
         return padded_tensor.contiguous()  # in contiguous memory
         
-        
+
+class RMTrainer(Trainer):
+    """ RMTrainer """
+    ...
+
+
+class PPOTrainer(PPOTrainer, Trainer):
+    """ PPOTrainer """
+    ...
+
+    
+class DPOTrainer(DPOTrainer):
+    """ DPOTrainer """
+    ...
+
+
+class ORPOTrainer(DPOTrainer):
+    """ DPOTrainer """
+    ...

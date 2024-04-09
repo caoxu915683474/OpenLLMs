@@ -29,8 +29,15 @@ class TrainerHelper:
     
     def __post_init__(self) -> None:
         """ __post_init__ """
-        self.set_trainer()
+        self.setup()
         
+    def setup(self) -> None:
+        """ setup """
+        self.set_data_collator()
+        self.set_metrics()
+        self.set_callbacks()
+        self.set_trainer()
+    
     def set_data_collator(self) -> None:
         """ set_collator """
         self.data_collator = DataCollatorForSeq2Seq(tokenizer=self.tokenizer,
@@ -48,9 +55,6 @@ class TrainerHelper:
     
     def set_trainer(self) -> None:
         """ set_trainer """
-        self.set_data_collator()
-        self.set_metrics()
-        self.set_callbacks()
         self.trainer = LMTrainer(model=self.model, 
                                  tokenizer=self.tokenizer,
                                  training_args=self.training_args, 

@@ -21,30 +21,39 @@ class PTFeatureWrapper:
     
     def unpacked_func(self, examples: Dict[str, Any]) -> Dict[str, List[Any]]:
         """ unpacked_func """
-        texts = [content for content in examples["content"]]
-        result = self.tokenizer(texts, 
-                                add_special_tokens=False, 
+        texts = [text.strip() + self.tokenizer.eos_token for text in examples["text"]]
+        result = self.tokenizer(texts,
+                                add_special_tokens=False,
                                 max_length=self.cutoff_len)
+        labels = []
+        for label in result["input_ids"]:
+            label_length = len(label)
+            for i in range(label_length):
+                if label[i] == self.tokenizer.eos_token_id and i != (label_length - 1):
+                    label[i] = IGNORE_INDEX
+            labels.append(label)
+        result["labels"] = labels
         return result
     
     def packed_func(self, examples: Dict[str, Any]) -> Dict[str, List[Any]]:
         """ packed_func """
-        texts = [doc.strip() for doc in examples["document"]]
+        texts = [text.strip() + self.tokenizer.eos_token for text in examples["text"]]
         texts_tokenized = self.tokenizer(texts, add_special_tokens=False)
-        texts_tokenized = {k: list(chain(*tokenized_examples[k])) for k in texts_tokenized.keys()}
-        total_length = len(texts_tokenized[list(concatenated_examples.keys())[0]])
+        texts_tokenized = {k: list(chain(*texts_tokenized[k])) for k in texts_tokenized.keys()}
+        total_length = len(texts_tokenized[list(texts_tokenized.keys())[0]])
         block_size = self.cutoff_len
         total_length = (total_length // block_size) * block_size
         result = {k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
                   for k, t in texts_tokenized.items()}
+        result["labels"] = result["input_ids"].copy()
         return result        
     
     def __call__(self, dataset: Union["Dataset", "IterableDataset"]) -> Union["Dataset", "IterableDataset"]:
         """ __call__ """
         column_names = list(next(iter(dataset)).keys())
         map_func = self.packed_func if self.packed else self.unpacked_func
-        dataset = dataset.map(map_func, 
-                              batched=True, 
+        dataset = dataset.map(map_func,
+                              batched=True,
                               remove_columns=column_names)
         return dataset
     

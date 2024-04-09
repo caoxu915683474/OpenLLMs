@@ -1,20 +1,74 @@
 import sys
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
 from typing import Union, Dict, List, Any, Literal
 from datasets import Dataset, IterableDataset, Features
 
 sys.path.append("../")
 from data import ROLE
 
-class SFTAlignWrapper:
+
+@dataclass
+class AlignWrapper(ABC):
+    """ AlignWrapper """
+    columns: List[str]
+    tags: Dict[str, Any] = None
+    formatting: Literal["alpaca", "sharegpt"] = None
+    
+    def __post_init__(self) -> None:
+        """ __post_init__ """
+        self.set_features_dict()
+    
+    @abstractmethod
+    def set_features_dict(self) -> None:
+        """ set_features_dict """
+        ...
+    
+    @abstractmethod
+    def align(self) -> Any:
+        """ align """
+        ...
+    
+    def __call__(self, dataset: Union["Dataset", "IterableDataset"]) -> Union["Dataset", "IterableDataset"]:
+        """ __call__ """
+        features = Features.from_dict(self.features_dict)
+        remove_columns = list(next(iter(dataset)).keys())
+        return dataset.map(self.align, 
+                           batched=True, 
+                           remove_columns=remove_columns, 
+                           features=features)
+
+
+class PTAlignWrapper(AlignWrapper):
+    """ PTAlignWrapper """
+    def set_features_dict(self) -> None:
+        """ set_features_dict """
+        self.features_dict = {"text": {"dtype": "string", "_type": "Value"}}
+    
+    def align(self, examples: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
+        """ align """
+        outputs = {"text": []}
+        for i in range(len(examples[self.columns["content"]])):
+            outputs["text"].append(examples[self.columns["content"]][i])
+        return outputs
+
+class SFTAlignWrapper(AlignWrapper):
     """ SFTAlignWrapper """
-    def __init__(self, 
-                 columns: List[str], 
-                 tags: Dict[str, Any], 
-                 formatting: Literal["alpaca", "sharegpt"]) -> None:
-        """ __init__ """
-        self.columns = columns
-        self.tags = tags
-        self.formatting = formatting
+    def set_features_dict(self) -> None:
+        """ set_features_dict """
+        self.features_dict = {"prompt": [{"role": {"dtype": "string", "_type": "Value"}, 
+                                    "content": {"dtype": "string", "_type": "Value"}}],
+                              "response": [{"role": {"dtype": "string", "_type": "Value"}, 
+                                       "content": {"dtype": "string", "_type": "Value"}}],
+                              "system": {"dtype": "string", "_type": "Value"},
+                              "tools": {"dtype": "string", "_type": "Value"}}
+    
+    def align(self, examples: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
+        """ align """
+        if self.formatting == "alpaca":
+            return self.alpaca(examples)
+        elif self.formatting == "sharegpt":
+            return self.sharegpt(examples)
     
     def alpaca(self, examples: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         """ alpaca_align """
@@ -84,18 +138,3 @@ class SFTAlignWrapper:
             outputs["system"].append(system)
             outputs["tools"].append(tools)
         return outputs
-        
-    def __call__(self, dataset: Union["Dataset", "IterableDataset"]) -> Union["Dataset", "IterableDataset"]:
-        """ __call__ """
-        features_dict = {"prompt": [{"role": {"dtype": "string", "_type": "Value"}, 
-                                    "content": {"dtype": "string", "_type": "Value"}}],
-                         "response": [{"role": {"dtype": "string", "_type": "Value"}, 
-                                       "content": {"dtype": "string", "_type": "Value"}}],
-                         "system": {"dtype": "string", "_type": "Value"},
-                         "tools": {"dtype": "string", "_type": "Value"}}
-        features = Features.from_dict(features_dict)
-        remove_columns = list(next(iter(dataset)).keys())
-        return dataset.map(eval("self.{}".format(self.formatting)), 
-                           batched=True, 
-                           remove_columns=remove_columns, 
-                           features=features)

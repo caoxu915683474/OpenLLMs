@@ -7,9 +7,9 @@ from datasets import Dataset, IterableDataset
 sys.path.append("../")
 from data import TEMPLATE
 from data.template import SFTTemplate
-from data.align import SFTAlignWrapper
+from data.align import PTAlignWrapper, SFTAlignWrapper
 from data.format import SFTFormatWrapper
-from data.feature import SFTFeatureWrapper
+from data.feature import PTFeatureWrapper, SFTFeatureWrapper
 from data.dataset import LMDataset, CVLMDataset
 
 """
@@ -34,7 +34,6 @@ class DatasetFactory(ABC):
     load_from: str
     name: str
     cutoff_len: int
-    reserved_label_len: int
     
     def __post_init__(self) -> None:
         """ __post_init__ """
@@ -85,6 +84,7 @@ class LMDatasetFactory(DatasetFactory):
 class PTLMDatasetFactory(LMDatasetFactory):
     """ PTLMDatasetFactory """
     packed: bool
+    template: str
     content: Optional[str] = "document"
     
     def __post_init__(self) -> None:
@@ -99,9 +99,11 @@ class PTLMDatasetFactory(LMDatasetFactory):
     def pipeline(self, tokenizer: "PreTrainedTokenizer", streaming: bool) -> None:
         """ pipeline """
         if streaming: self.dataset = self.dataset.to_iterable_dataset()
+        align_wrapper = PTAlignWrapper(columns=self.columns)
         feature_wrapper = PTFeatureWrapper(tokenizer=tokenizer, 
                                            packed=self.packed,
                                            cutoff_len=self.cutoff_len)
+        self.dataset = align_wrapper(dataset=self.dataset)
         self.dataset = feature_wrapper(dataset=self.dataset)
         
 
@@ -110,6 +112,7 @@ class SFTLMDatasetFactory(LMDatasetFactory):
     """ SFTLMDatasetFactory """
     packed: bool
     template: str
+    reserved_label_len: int
     train_on_prompt: Optional[bool] = False
     
     def __post_init__(self) -> None:
@@ -133,8 +136,7 @@ class SFTLMDatasetFactory(LMDatasetFactory):
                                             train_on_prompt=self.train_on_prompt)
         self.dataset = align_wrapper(dataset=self.dataset)
         self.dataset = format_wrapper(dataset=self.dataset)
-        self.dataset = feature_wrapper(dataset=self.dataset,
-                                       efficient_eos=template.efficient_eos)
+        self.dataset = feature_wrapper(dataset=self.dataset, efficient_eos=template.efficient_eos)
         
         
 @dataclass
