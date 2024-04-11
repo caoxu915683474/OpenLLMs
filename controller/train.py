@@ -4,16 +4,15 @@ import torch
 from torch import nn
 from datasets import Dataset, IterableDataset
 from transformers import (PreTrainedModel,
-                          Seq2SeqTrainer, 
                           TrainingArguments, 
                           TrainerCallback, 
                           PreTrainedTokenizer, 
-                          EvalPrediction, 
-                          Trainer)
-from trl import PPOConfig, PPOTrainer
-from trl.core import PPODecorators, logprobs_from_logits
+                          EvalPrediction)
+#from trl import PPOConfig, PPOTrainer
+#from trl.core import PPODecorators, logprobs_from_logits
 
 sys.path.append("../")
+from sourcecode.trainer_seq2seq import Seq2SeqTrainer
 from params.finetuning_args import FinetuningArguments
 from controller.utils import create_custom_optimizer
 
@@ -88,7 +87,7 @@ class LMTrainer(Seq2SeqTrainer):
         padded_tensor[:, -src_tensor.shape[-1] :] = src_tensor  # adopt left-padding
         return padded_tensor.contiguous()  # in contiguous memory
         
-
+'''
 class RMTrainer(Trainer):
     """ RMTrainer """
     ...
@@ -99,11 +98,13 @@ class PPOTrainer(PPOTrainer, Trainer):
     ...
 
     
-class DPOTrainer(DPOTrainer):
+class DPOTrainer(PPOTrainer):
     """ DPOTrainer """
     ...
 
 
-class ORPOTrainer(DPOTrainer):
+class ORPOTrainer(PPOTrainer):
     """ DPOTrainer """
     ...
+
+'''

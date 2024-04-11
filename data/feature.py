@@ -21,6 +21,7 @@ class PTFeatureWrapper:
     
     def unpacked_func(self, examples: Dict[str, Any]) -> Dict[str, List[Any]]:
         """ unpacked_func """
+        model_inputs = {}
         texts = [text.strip() + self.tokenizer.eos_token for text in examples["text"]]
         result = self.tokenizer(texts,
                                 add_special_tokens=False,
@@ -32,11 +33,14 @@ class PTFeatureWrapper:
                 if label[i] == self.tokenizer.eos_token_id and i != (label_length - 1):
                     label[i] = IGNORE_INDEX
             labels.append(label)
-        result["labels"] = labels
-        return result
+        model_inputs["input_ids"] = result["input_ids"]
+        model_inputs["attention_mask"] = result["attention_mask"]
+        model_inputs["labels"] = labels
+        return model_inputs
     
     def packed_func(self, examples: Dict[str, Any]) -> Dict[str, List[Any]]:
         """ packed_func """
+        model_inputs = {}
         texts = [text.strip() + self.tokenizer.eos_token for text in examples["text"]]
         texts_tokenized = self.tokenizer(texts, add_special_tokens=False)
         texts_tokenized = {k: list(chain(*texts_tokenized[k])) for k in texts_tokenized.keys()}
@@ -45,8 +49,10 @@ class PTFeatureWrapper:
         total_length = (total_length // block_size) * block_size
         result = {k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
                   for k, t in texts_tokenized.items()}
-        result["labels"] = result["input_ids"].copy()
-        return result        
+        model_inputs["input_ids"] = result["input_ids"]
+        model_inputs["attention_mask"] = result["attention_mask"]
+        model_inputs["labels"] = result["input_ids"].copy()
+        return model_inputs        
     
     def __call__(self, dataset: Union["Dataset", "IterableDataset"]) -> Union["Dataset", "IterableDataset"]:
         """ __call__ """

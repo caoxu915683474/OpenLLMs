@@ -65,6 +65,7 @@ class ModelHelper:
         """ set_config """
         self.config = LMConfig(path=self.args.path, init_kwargs=self.init_kwargs).get_config()
         self.config = self.config_patcher(self.config)
+        self.init_kwargs = self.config_patcher.get_init_kwargs()
     
     def set_adapter(self) -> None:
         """ set_adapter """

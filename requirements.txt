@@ -20,6 +20,8 @@ matplotlib
 fire
 flash-attn==2.5.1.post1
 jieba
+nltk
+rouge_chinese
 tiktoken
 zstandard
 transformers_stream_generator

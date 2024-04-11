@@ -2,7 +2,6 @@ import sys
 from typing import Dict, Any, Literal
 from dataclasses import dataclass
 import torch
-from unsloth import FastLanguageModel
 from transformers import PreTrainedModel, PretrainedConfig, AutoModelForCausalLM
 
 sys.path.append("../")

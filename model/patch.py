@@ -141,7 +141,7 @@ class ConfigPatcher:
         if getattr(config, "quantization_config", None):  # ptq
             if is_deepspeed_zero3_enabled():
                 raise ValueError("DeepSpeed ZeRO-3 is incompatible with quantization.")
-            init_kwargs["device_map"] = {"": get_current_device()}
+            self.init_kwargs["device_map"] = {"": get_current_device()}
             quantization_config: Dict[str, Any] = getattr(config, "quantization_config", None)
             quant_method = quantization_config.get("quant_method", "")
             if quant_method == "gptq":
@@ -163,8 +163,8 @@ class ConfigPatcher:
             self.init_kwargs["quantization_config"] = GPTQConfig(bits=self.export_quantization_bit,
                                                                  tokenizer=self.tokenizer,
                                                                  dataset=quantization_dataset)
-            init_kwargs["device_map"] = "auto"
-            init_kwargs["max_memory"] = get_max_memory()
+            self.init_kwargs["device_map"] = "auto"
+            self.init_kwargs["max_memory"] = get_max_memory()
             logger.info("Quantizing model to {} bit.".format(self.export_quantization_bit))
         elif self.quantization_bit is not None:  # bnb
             if is_deepspeed_zero3_enabled():
@@ -173,18 +173,21 @@ class ConfigPatcher:
                 require_version("bitsandbytes>=0.43.0", "To fix: pip install bitsandbytes>=0.43.0")
             if self.quantization_bit == 8:
                 require_version("bitsandbytes>=0.37.0", "To fix: pip install bitsandbytes>=0.37.0")
-                init_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
+                self.init_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
             elif self.quantization_bit == 4:
                 require_version("bitsandbytes>=0.39.0", "To fix: pip install bitsandbytes>=0.39.0")
-                init_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True,
+                self.init_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True,
                                                                         bnb_4bit_compute_dtype=self.compute_dtype,
                                                                         bnb_4bit_use_double_quant=self.double_quantization,
                                                                         bnb_4bit_quant_type=self.quantization_type,
                                                                         bnb_4bit_quant_storage=self.compute_dtype)
 
-            init_kwargs["device_map"] = {"": get_current_device()}
+            self.init_kwargs["device_map"] = {"": get_current_device()}
             logger.info("Quantizing model to {} bit.".format(self.quantization_bit))
     
+    def get_init_kwargs(self) -> Dict[str, Any]:
+        """ get_init_kwargs """
+        return self.init_kwargs
 
     def __call__(self, config: "PretrainedConfig") -> "PretrainedConfig":
         """ __call__ """
@@ -210,6 +213,7 @@ class ConfigPatcher:
                 self.init_kwargs["device_map"] = self.device_map or {"": get_current_device()}
             if self.init_kwargs["device_map"] == "auto":
                 self.init_kwargs["offload_folder"] = self.offload_folder
+        return config
 
 @dataclass
 class ModelPatcher:

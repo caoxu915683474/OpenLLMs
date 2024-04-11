@@ -11,6 +11,9 @@ from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR, has_length
 
 sys.path.append("../")
 from extras.constant import LOG_FILE_NAME
+from extras.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class LogCallback(TrainerCallback):
@@ -107,22 +110,26 @@ class LogCallback(TrainerCallback):
         """ Event called after logging the last logs. """
         if not state.is_local_process_zero:
             return
+        
+        logger.info(state.log_history[-1])
         logs = dict(current_steps=self.cur_steps,
                     total_steps=self.max_steps,
+                    global_step=state.log_history[-1].get("step", None),
                     loss=state.log_history[-1].get("loss", None),
                     eval_loss=state.log_history[-1].get("eval_loss", None),
                     predict_loss=state.log_history[-1].get("predict_loss", None),
                     reward=state.log_history[-1].get("reward", None),
                     learning_rate=state.log_history[-1].get("learning_rate", None),
                     num_input_tokens_seen=state.log_history[-1].get("num_input_tokens_seen", None),
+                    train_tokens_per_second=state.log_history[-1].get("train_tokens_per_second", None),
                     epoch=state.log_history[-1].get("epoch", None),
                     percentage=round(self.cur_steps / self.max_steps * 100, 2) \
                                                     if self.max_steps != 0 else 100,
                     elapsed_time=self.elapsed_time,
                     remaining_time=self.remaining_time)
-        if self.runner is not None:
-            logger.info("{{'loss': {:.4f}, 'learning_rate': {:2.4e}, 'epoch': {:.2f}}}"\
-                            .format(logs["loss"] or 0, logs["learning_rate"] or 0, logs["epoch"] or 0))
+        if self.runner is None:
+            logger.info("{{'epoch': {:.2f}, 'gloabl_step': {}, 'loss': {:.4f}, 'learning_rate': {:2.4e}, 'tokens/s': {:.2f}}}"\
+                            .format(logs["epoch"] or 0, logs["global_step"] or 0, logs["loss"] or 0, logs["learning_rate"] or 0, logs["train_tokens_per_second"] or 0))
         os.makedirs(args.output_dir, exist_ok=True)
         with open(os.path.join(args.output_dir, "trainer_log.jsonl"), "a", encoding="utf-8") as f:
             f.write(json.dumps(logs) + "\n")
