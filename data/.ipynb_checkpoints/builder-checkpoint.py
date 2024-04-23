@@ -1,6 +1,6 @@
 import sys
 from dataclasses import dataclass
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Any
 from transformers import PreTrainedTokenizer
 from datasets import (Dataset,
                       IterableDataset,
@@ -25,11 +25,14 @@ class DataBuilder:
     template: str
     streaming: bool
     seed: int
+    context: Any
+    num_shards: int
     
     def __post_init__(self):
         """ __post_init__ """
-        self.set_factorys()
-        self.construction()
+        with self.context:
+            self.set_factorys()
+            self.construction()
     
     def set_factorys(self) -> None:
         """ set_factorys """
@@ -38,7 +41,7 @@ class DataBuilder:
             if name not in DATA_INFO:
                 raise ValueError("Undefined dataset {} in {}.".format(name, "DATA_INFO"))
             data_info = DATA_INFO[name]
-            factory = eval(data_info["factory"])(**data_info, template=self.template)
+            factory = eval(data_info["factory"])(**data_info, template=self.template, num_shards=self.num_shards)
             factorys.append(factory)
         self.factorys = factorys
     
@@ -52,7 +55,7 @@ class DataBuilder:
         if len(datasets) == 1:
             self.dataset= datasets[0]
         elif self.mix_strategy == "concat":
-            self.dataset = concatenate_datasets(all_datasets)
+            self.dataset = concatenate_datasets(datasets)
         elif self.mix_strategy.startswith("interleave"):
             self.dataset = interleave_datasets(datasets=datasets,
                                                probabilities=self.probs,

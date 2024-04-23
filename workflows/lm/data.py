@@ -1,5 +1,5 @@
 import sys
-from typing import Union
+from typing import Union, Any
 from dataclasses import dataclass
 from transformers import DataCollatorForSeq2Seq, PreTrainedTokenizer
 from datasets import Dataset, IterableDataset
@@ -14,8 +14,10 @@ class DatasetHelper:
     """ DatasetHelper """
     args: "DataArguments"
     tokenizer: "PreTrainedTokenizer"
+    context: Any
     seed: int
     do_train: bool
+    num_shards: int
     
     def __post_init__(self) -> None:
         """ __post_init__ """
@@ -35,7 +37,9 @@ class DatasetHelper:
                                         probs=self.args.probs,
                                         template=self.args.template,
                                         streaming=self.args.streaming,
-                                        seed=self.seed)
+                                        seed=self.seed, 
+                                        context=self.context,
+                                        num_shards=self.num_shards)
     
     def set_dataset(self) -> None:
         """ set_dataset """
@@ -56,8 +60,8 @@ class DatasetHelper:
                     self.dataset = {"train_dataset": self.dataset["train"], "eval_dataset": self.dataset["test"]}
             else:
                 if self.args.streaming:
-                    self.dataset = self.dataset.shuffle(buffer_size=self.args.buffer_size, seed=self.seed)
-                    self.dataset = {"train_dataset": self.dataset}
+                    self.dataset = self.dataset.shuffle(buffer_size=self.args.buffer_size, seed=self.seed)    
+                self.dataset = {"train_dataset": self.dataset}
         else:  # do_eval or do_predict
             self.dataset = {"eval_dataset": self.dataset}
     

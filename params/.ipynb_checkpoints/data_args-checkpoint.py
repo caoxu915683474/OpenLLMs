@@ -20,7 +20,8 @@ class DataArguments:
     cutoff_len: Optional[int] = field(default=1024, metadata={"help": "The cutoff length of the model inputs after tokenization."})
     reserved_label_len: Optional[int] = field(default=1, metadata={"help": "The minimum cutoff length reserved for label after tokenization."})
     val_size: Optional[float] = field(default=0.0, metadata={"help": "Size of the development set, should be an integer or a float in range `[0,1)`."})
-    buffer_size: int = field(default=16384, metadata={"help": "Size of the buffer to randomly sample examples from in dataset streaming."})
+    buffer_size: int = field(default=1000, metadata={"help": "Size of the buffer to randomly sample examples from in dataset streaming."})
+    num_shards: int = field(default=1, metadata={"help": "Shards to split the dataset to accelerate the iteration speed."})
 
     def __post_init__(self) -> None:
         """ __post_init__ """

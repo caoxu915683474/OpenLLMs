@@ -1,31 +1,22 @@
 alpaca_data_zh_51k:
     factory: "AlpacaSFTLMDatasetFactory"
-    load_from: "/home/data/llm_projects/OpenLLMs/data/examples/alpaca_data_zh_51k.jsonl.zst"
+    load_from: "/root/autodl-tmp/OpenLLMs/data/examples/alpaca_data_zh_51k.jsonl.zst"
     name: "alpaca_data_zh_51k"
-    cutoff_len: 1024
+    cutoff_len: 512
     reserved_label_len: 1
     train_on_prompt: True
     packed: False
-    
 alpaca_gpt4_data_zh:
     factory: "AlpacaSFTLMDatasetFactory"
-    load_from: "/home/data/llm_projects/OpenLLMs/data/examples/alpaca_gpt4_data_zh.jsonl.zst"
+    load_from: "/root/autodl-tmp/OpenLLMs/data/examples/alpaca_gpt4_data_zh.jsonl.zst"
     name: "alpaca_gpt4_data_zh"
     cutoff_len: 1024
     reserved_label_len: 1
     train_on_prompt: False
     packed: True
-    
 baiduyidian:
     factory: "PTLMDatasetFactory"
-    load_from: "/home/data/llm_projects/OpenLLMs/data/examples/baiduyidian/"
+    load_from: "/root/autodl-tmp/tmp/yidian/"
     name: "baiduyidian"
     cutoff_len: 1024
     packed: True
-    
-# yidian2:
-#     factory: "PTLMDatasetFactory"
-#     load_from: "/root/autodl-tmp/tmp/yidian/"
-#     name: "yidian2"
-#     cutoff_len: 4096
-#     packed: False

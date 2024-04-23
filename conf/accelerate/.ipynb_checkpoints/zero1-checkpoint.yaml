@@ -2,10 +2,10 @@ compute_environment: LOCAL_MACHINE
 deepspeed_config:
     deepspeed_multinode_launcher: standard
     gradient_clipping: 1.0
-    offload_optimizer_device: cpu
-    offload_param_device: cpu
-    zero3_init_flag: True
-    zero_stage: 3
+    offload_optimizer_device: none
+    offload_param_device: none
+    zero3_init_flag: False
+    zero_stage: 1
     zero3_save_16bit_model: True
 distributed_type: DEEPSPEED
 fsdp_config: {}

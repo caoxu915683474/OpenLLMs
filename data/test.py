@@ -26,17 +26,18 @@ if __name__ == '__main__':
                             cache_dir=model_args.cache_dir).get_tokenizer()
     tokenizer = patcher(tokenizer)
     data_builder = DataBuilder(tokenizer=tokenizer,
-                               dataset=data_args.dataset, 
+                               dataset=data_args.dataset,
                                mix_strategy=data_args.mix_strategy,
-                               probs=data_args.probs, 
+                               probs=data_args.probs,
                                template=data_args.template,
                                streaming=data_args.streaming,
-                               seed=training_args.seed)
+                               seed=training_args.seed,
+                               context=training_args.main_process_first(),
+                               num_shards=data_args.num_shards)
     dataset = data_builder.get_dataset()
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer,
                                            pad_to_multiple_of=8,
                                            label_pad_token_id=IGNORE_INDEX)
-    # data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     dataloader = DataLoader(dataset, 
                             batch_size=2,
                             num_workers=1,
@@ -45,8 +46,7 @@ if __name__ == '__main__':
     for batch in dataloader:
         assert len(batch["input_ids"][0]) == len(batch["labels"][0])
         assert len(batch["input_ids"][1]) == len(batch["labels"][1])
-        print(tokenizer.decode(batch["input_ids"][0], skip_special_tokens=False))
+        print("".join(tokenizer.decode(batch["input_ids"][0], skip_special_tokens=False).split()))
         print("-" * 100)
         print(tokenizer.decode([id_ for id_ in batch["labels"][0] if id_ != -100], skip_special_tokens=False))
-        # print(tokenizer.decode([id_  if id_ != -100 else tokenizer.eos_token_id for id_ in batch["labels"][0]], skip_special_tokens=False))
         input()

@@ -34,6 +34,7 @@ class DatasetFactory(ABC):
     load_from: str
     name: str
     cutoff_len: int
+    num_shards: int
     
     def __post_init__(self) -> None:
         """ __post_init__ """
@@ -98,7 +99,7 @@ class PTLMDatasetFactory(LMDatasetFactory):
     
     def pipeline(self, tokenizer: "PreTrainedTokenizer", streaming: bool) -> None:
         """ pipeline """
-        if streaming: self.dataset = self.dataset.to_iterable_dataset()
+        if streaming: self.dataset = self.dataset.to_iterable_dataset(num_shards=self.num_shards)
         align_wrapper = PTAlignWrapper(columns=self.columns)
         feature_wrapper = PTFeatureWrapper(tokenizer=tokenizer, 
                                            packed=self.packed,
@@ -123,7 +124,7 @@ class SFTLMDatasetFactory(LMDatasetFactory):
     
     def pipeline(self, tokenizer: "PreTrainedTokenizer", streaming: bool) -> None:
         """ pipeline """
-        if streaming: self.dataset = self.dataset.to_iterable_dataset()
+        if streaming: self.dataset = self.dataset.to_iterable_dataset(num_shards=self.num_shards)
         align_wrapper = SFTAlignWrapper(columns=self.columns, 
                                         tags=self.tags, 
                                         formatting=self.formatting)
