@@ -1,9 +1,0 @@
-qwen_v1:
-  user: "<|im_start|>user\\n{content}<|im_end|>\\n<|im_start|>assistant\\n"
-  assistant: "<|im_start|>system\\n{content}<|im_end|>\\n"
-  separator: "\n"
-  system: "You are a helpful assistant."
-  stop_words: ["<|im_end|>"]
-  efficient_eos: False
-  replace_eos: True
-  force_system: False
