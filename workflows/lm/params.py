@@ -1,12 +1,11 @@
 import sys
-from transformers import HfArgumentParser
+from transformers import HfArgumentParser, Seq2SeqTrainingArguments
 
 sys.path.append("../")
 from params import (DataArguments, 
                     ModelArguments, 
                     FinetuningArguments, 
                     GeneratingArguments)
-from sourcecode.training_args_seq2seq import Seq2SeqTrainingArguments
 
 
 class ParamHelper:

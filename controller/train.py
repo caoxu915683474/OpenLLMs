@@ -4,15 +4,13 @@ import torch
 from torch import nn
 from datasets import Dataset, IterableDataset
 from transformers import (PreTrainedModel,
+                          Seq2SeqTrainer,
                           TrainingArguments, 
                           TrainerCallback, 
                           PreTrainedTokenizer, 
                           EvalPrediction)
-#from trl import PPOConfig, PPOTrainer
-#from trl.core import PPODecorators, logprobs_from_logits
 
 sys.path.append("../")
-from sourcecode.trainer_seq2seq import Seq2SeqTrainer
 from params.finetuning_args import FinetuningArguments
 from controller.utils import create_custom_optimizer
 
